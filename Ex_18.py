@@ -30,5 +30,9 @@ input = """28
 10
 3"""
 
+##Parse the input string into a list of ints. I assume the input is a consistent list of integers evenly separated by newlines.
 parsed_input = [int(a) for a in input.splitlines()]
+
+##Sort the list in place
+parsed_input.sort()
 print(parsed_input)
