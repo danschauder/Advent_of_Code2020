@@ -1843,6 +1843,8 @@ reg1 = re.compile(r"""
 tiles = [a for a in re.split(reg1,input) if len(a)>0]
 edges_to_tiles={}
 tiles_to_tiles={}
+common_edges={}
+tile_matrices={}
 
 reg2 = re.compile(r"""
                 \s(\d+):\n
@@ -1864,6 +1866,7 @@ for tile in tiles:
                 line.append(0)
         arr.append(line)
     a = np.array(arr)
+    tile_matrices[tile_id]=a
     for el in a[0:1,:]:
         for k in el:
             edges[0]=edges[0]+str(k)
@@ -1890,6 +1893,13 @@ for tile in tiles:
                     tiles_to_tiles[other_tile].add(tile_id)
                 else:
                     tiles_to_tiles[other_tile]=set([tile_id])
+
+                if tuple([tile_id,other_tile]) in common_edges.keys():
+                    common_edges[tuple([tile_id,other_tile])].add(edge)
+                    common_edges[tuple([other_tile,tile_id])].add(edge)
+                else:
+                    common_edges[tuple([tile_id,other_tile])]=set([edge])
+                    common_edges[tuple([other_tile,tile_id])]=set([edge])                    
             edges_to_tiles[edge].append(tile_id)
         else:
             edges_to_tiles[edge]=[tile_id]
@@ -1923,9 +1933,7 @@ current_row=[]
 i=0
 j=0
 while len(current_row)<m and len(ordered_tiles)<m:
-    # print(ordered_tiles)
     tile_options = [k for k in tiles_to_tiles[ordered_tiles[i][j]] if k not in placed_tiles]
-    # print(tile_options)
     next_tile=tile_options[0]
     current_row.append(next_tile)
     placed_tiles.add(next_tile)
@@ -1937,29 +1945,181 @@ while len(current_row)<m and len(ordered_tiles)<m:
     else:
         j+=1
 
-for el in ordered_tiles:
-    print(el)
 
-print(len(placed_tiles))
+def orient_right(tile,edge):
+    cols = np.shape(tile)[1]-1
+    i=0
+    found_orientation=False
+    while i<4 and not found_orientation:
+        if ''.join(str(a) for a in tile[:,cols]) == edge:
+            return tile
+            found_orientation=True
+        else:
+            tile = np.rot90(tile)
+            i+=1
+    tile = np.flipud(tile)
+    i=0
+    while i<4 and not found_orientation:
+        if ''.join(str(a) for a in tile[:,cols]) == edge:
+            return tile
+            found_orientation=True
+        else:
+            tile = np.rot90(tile)
+            i+=1
+
+def orient_left(tile,edge):
+    i=0
+    found_orientation=False
+    while i<4 and not found_orientation:
+        if ''.join(str(a) for a in tile[:,0]) == edge:
+            return tile
+            found_orientation=True
+        else:
+            tile = np.rot90(tile)
+            i+=1
+    tile = np.flipud(tile)
+    i=0
+    while i<4 and not found_orientation:
+        if ''.join(str(a) for a in tile[:,0]) == edge:
+            return tile
+            found_orientation=True
+        else:
+            tile = np.rot90(tile)
+            i+=1
+
+def strip_right_border(tile):
+    shape = np.shape(tile)
+    rows = shape[0]
+    cols = shape[1]
+    return tile[:,0:cols-1]
+
+def strip_left_border(tile):
+    shape = np.shape(tile)
+    rows = shape[0]
+    cols = shape[1]
+    return tile[:,1:cols]
+
+def strip_top_border(row):
+    shape = np.shape(row)
+    rows = shape[0]
+    cols = shape[1]
+    return row[1:rows,:]
+
+def strip_bottom_border(row):
+    shape = np.shape(row)
+    rows = shape[0]
+    cols = shape[1]
+    return row[:rows-1,:]
+
+joined_rows=[]
+
+for row in ordered_tiles:
+    tid1 = row[0]
+    tid2 = row[1]
+    common = list(common_edges[tuple([tid1,tid2])])
+    t1 = orient_right(tile_matrices[tid1],common[0])
+    t1 = strip_right_border(t1)
+    t1 = strip_left_border(t1)
+    t2 = orient_left(tile_matrices[tid2],common[0])
+    t2 = strip_left_border(t2)
+    joined_array = np.concatenate((t1,t2),axis=1)
+    i=2
+    while i<len(row):
+        t = tile_matrices[row[i]]
+        edge = ''.join([str(a) for a in joined_array[:,np.shape(joined_array)[1]-1]])
+        t = orient_left(t,edge)
+        t = strip_left_border(t)
+        joined_array = strip_right_border(joined_array)
+        joined_array = np.concatenate((joined_array,t),axis=1)
+        i+=1
+    joined_array = strip_right_border(joined_array)
+    joined_rows.append(joined_array)
+    # print(joined_array)
+
+# for el in joined_rows:
+#     print(el)
+
+full_puzzle = joined_rows[0]
+for i in range(1,len(joined_rows)):
+    if ''.join([str(a) for a in full_puzzle[np.shape(full_puzzle)[0]-1,:]]) == ''.join([str(b) for b in joined_rows[i][0,:]]):
+        full_puzzle = strip_bottom_border(full_puzzle)
+        joined_rows[i] = strip_top_border(joined_rows[i])
+        full_puzzle = np.concatenate((full_puzzle,joined_rows[i]),axis=0)
+    else:
+        joined_rows[i]=np.flipud(joined_rows[i])
+        if ''.join([str(a) for a in full_puzzle[np.shape(full_puzzle)[0]-1,:]]) == ''.join([str(b) for b in joined_rows[i][0,:]]):
+            full_puzzle = strip_bottom_border(full_puzzle)
+            joined_rows[i] = strip_top_border(joined_rows[i])
+            full_puzzle = np.concatenate((full_puzzle,joined_rows[i]),axis=0)
+        else:
+            full_puzzle = np.flipud(full_puzzle)
+            if ''.join([str(a) for a in full_puzzle[np.shape(full_puzzle)[0]-1,:]]) == ''.join([str(b) for b in joined_rows[i][0,:]]):
+                full_puzzle = strip_bottom_border(full_puzzle)
+                joined_rows[i] = strip_top_border(joined_rows[i])
+                full_puzzle = np.concatenate((full_puzzle,joined_rows[i]),axis=0)
+            else:
+                joined_rows[i]=np.flipud(joined_rows[i])
+                full_puzzle = strip_bottom_border(full_puzzle)
+                joined_rows[i] = strip_top_border(joined_rows[i])
+                full_puzzle = np.concatenate((full_puzzle,joined_rows[i]),axis=0)
+
+full_puzzle = strip_bottom_border(full_puzzle)
+full_puzzle = strip_top_border(full_puzzle)
+
+def convert_to_clean_string(p):
+    puzzle_string=np.array2string(p,separator='')
+    clean_puz_reg = re.compile(r'[\[|\]| ]*')
+    clean_puzzle_string = re.sub(clean_puz_reg,'',puzzle_string)
+    return clean_puzzle_string
+
+monster_pattern = re.compile(r"""
+                            ^.*1.{1,1}
+                            \n
+                            1.{4,4}11.{4,4}11.{4,4}111
+                            \n
+                            .1.{2,2}1.{2,2}1.{2,2}1.{2,2}1.{2,2}1.{3,3}$
+                            """,re.VERBOSE)
+
+def has_monster(p):
+    clean_p = convert_to_clean_string(p)
+    if len(re.findall(monster_pattern,clean_p))>0:
+        return 1
+    else:
+        return 0
+
+def count_monsters(p):
+    rows = np.shape(p)[0]
+    cols = np.shape(p)[1]
+    i=3
+    j=20
+    ans=0
+    while i<=rows and j<=cols:
+        box = p[i-3:i,j-20:j]
+        ans += has_monster(box)
+        if j==cols:
+            j=20
+            i+=1
+        else:
+            j+=1
+    return ans
 
 
+monster_count=0
+k=0
+while monster_count==0 and k<4:
+    monster_count += count_monsters(full_puzzle)
+    full_puzzle=np.rot90(full_puzzle)
+    k+=1
 
-# print(tiles_to_tiles['3571'])
-# print(tiles_to_tiles['2711'])
-# while len(ordered_tiles)<num_tiles:
-#     # print(len(ordered_tiles))
-#     next_tile_options = [k for k in tiles_to_tiles[current_tile] if k not in ordered_tiles and k!=current_tile]
-#     print(current_tile)
-#     print(next_tile_options)
-#     least_paths = 1000
-#     next_tile=0
-#     for tile in next_tile_options:
-#         if len(tiles_to_tiles[tile])-1<least_paths:
-#             least_paths=len(tiles_to_tiles[tile])-1
-#             next_tile=tile
-#     current_tile=next_tile
-#     ordered_tiles.append(next_tile)
-    
-# while idx<num_tiles-1:
+if monster_count==0:
+    full_puzzle = np.flipud(full_puzzle)
 
-# print(ordered_tiles)
+while monster_count==0 and k<8:
+    monster_count += count_monsters(full_puzzle)
+    full_puzzle=np.rot90(full_puzzle)
+    k+=1
+
+total_hashes = np.nansum(full_puzzle)
+hashes_per_monster = 15
+ans = total_hashes - (monster_count*hashes_per_monster)
+print(ans)
