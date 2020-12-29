@@ -24,6 +24,55 @@ import re
 # aaabbb
 # aaaabbb"""
 
+# input="""42: 9 14 | 10 1
+# 9: 14 27 | 1 26
+# 10: 23 14 | 28 1
+# 1: "a"
+# 11: 42 31
+# 5: 1 14 | 15 1
+# 19: 14 1 | 14 14
+# 12: 24 14 | 19 1
+# 16: 15 1 | 14 14
+# 31: 14 17 | 1 13
+# 6: 14 14 | 1 14
+# 2: 1 24 | 14 4
+# 0: 8 11
+# 13: 14 3 | 1 12
+# 15: 1 | 14
+# 17: 14 2 | 1 7
+# 23: 25 1 | 22 14
+# 28: 16 1
+# 4: 1 1
+# 20: 14 14 | 1 15
+# 3: 5 14 | 16 1
+# 27: 1 6 | 14 18
+# 14: "b"
+# 21: 14 1 | 1 14
+# 25: 1 1 | 1 14
+# 22: 14 14
+# 8: 42
+# 26: 14 22 | 1 20
+# 18: 15 15
+# 7: 14 5 | 1 21
+# 24: 14 1
+
+# abbbbbabbbaaaababbaabbbbabababbbabbbbbbabaaaa
+# bbabbbbaabaabba
+# babbbbaabbbbbabbbbbbaabaaabaaa
+# aaabbbbbbaaaabaababaabababbabaaabbababababaaa
+# bbbbbbbaaaabbbbaaabbabaaa
+# bbbababbbbaaaaaaaabbababaaababaabab
+# ababaaaaaabaaab
+# ababaaaaabbbaba
+# baabbaaaabbaaaababbaababb
+# abbbbabbbbaaaababbbbbbaaaababb
+# aaaaabbaabaaaaababaa
+# aaaabbaaaabbaaa
+# aaaabbaabbaaaaaaabbbabbbaaabbaabaaa
+# babaaabbbaaabaababbaabababaaab
+# aabbbbbaabbbaaaaaabbbbbababaaaaabbaaabba"""
+
+
 input="""91: 94 94
 122: 117 24 | 33 67
 6: 117 40 | 33 47
@@ -161,7 +210,7 @@ input="""91: 94 94
 23: 33 4 | 117 119
 77: 117 62 | 33 71
 3: 33 128 | 117 29
-0: 42 11
+0: 8 11
 
 abbbaaaaaabbbaabababaaab
 bbbaaababbaabbaabbbabbaa
@@ -618,10 +667,7 @@ reg1=re.compile(r"\n\n",re.VERBOSE)
 split_input = [a for a in re.split(reg1,input) if len(a)>0]
 raw_rules = split_input[0]
 raw_messages=split_input[1]
-max_msg_length=0
-for msg in raw_messages.splitlines():
-    if len(msg.strip())>max_msg_length:
-        max_msg_length=len(msg.strip())
+
 
 reg2=re.compile(r"""
                 ^(\d+):(.*)$
@@ -634,6 +680,7 @@ reg3=re.compile(r"""
 split_raw_rules = raw_rules.splitlines()
 
 rules = {}
+terminals = {}
 
 for rule in split_raw_rules:
     split_rule = [a for a in re.split(reg2,rule) if len(a)>0]
@@ -641,6 +688,7 @@ for rule in split_raw_rules:
     val = re.findall(reg3,split_rule[1])
     if len(val)>0:
         rules[key]=val[0]
+        terminals[val[0]]=key
     elif '|' in split_rule[1]:
         rule_list = split_rule[1].strip().split('|')
         rules[key]=[]
@@ -651,6 +699,10 @@ for rule in split_raw_rules:
                 if len(el)>0:
                     orders.append(int(el))
             rules[key].append(orders)
+    elif key==8:
+        rules[key]=[[42],[42,8]]
+    elif key==11:
+        rules[key]=[[42,31],[42,11,31]]
     else:
         rules[key]=[]
         key_references=split_rule[1].strip().split(' ')
@@ -660,133 +712,51 @@ for rule in split_raw_rules:
                 orders.append(int(el))
         rules[key].append(orders)
 
-# print(rules)
 
-# valid=set()
+DP={}
 
-# def eval_rule(rule_id, sequence):
-#     # print(f"rule id {rule_id}. Sequence so far: {sequence}")
-#     if isinstance(rules[rule_id],str):
-#         # print(f"returning {rules[rule_id]}")
-#         return rules[rule_id]
-#     else:
-#         for cmd in rules[rule_id]:
-#             new_seq=sequence
-#             for id in cmd:
-#                 new_seq += eval_rule(id, new_seq)
+def match_split(s,i,j,rules):
+    k = (i,j,tuple(rules))
 
+    if i==j and not rules:
+        return True
+    elif i==j:
+        return False
+    elif not rules:
+        return False
+    
+    matched = False
 
-# valid=set()
+    for l in range(i+1,j+1):
+        if match_string(s,i,l,rules[0]) and match_split(s,l,j,rules[1:]):
+            matched = True
+    
+    return matched
 
-# def eval_rule(rule_id, sequence):
-#     print(f"rule id {rule_id}. Sequence so far: {sequence}")
-#     if isinstance(rules[rule_id],str):
-#         print(f"adding {rules[rule_id]} to sequence")
-#         return rules[rule_id]
-#     else:
-#         for cmd in rules[rule_id]:
-#             new_seq=sequence
-#             for id in cmd:
-#                 new_seq += eval_rule(id, new_seq)
-#             if new_seq!=sequence:
-#                 print(f"Adding {new_seq} to set")
-#                 valid.add(new_seq)
-#         return ''
+def match_string(s,i,j,rule):
+    k = (i,j,rule)
+    if k in DP:
+        return DP[k]
+    
+    matched = False
 
-# def eval_rule(sequence,rule_id,todo):
-#     print(sequence)
-#     print(rule_id)
-#     print(todo)
-#     if isinstance(rules[rule_id],str):
-#         new_seq = sequence + rules[rule_id]
-#         if len(todo)==0:
-#             return new_seq
-#         else:
-#             next_rule = todo.pop(0)
-#             return eval_rule(new_seq,next_rule,todo)
-#     else:
-#         ans=set()
-#         if len(rules[rule_id])>1:
-#             for td in rules[rule_id]:
-#                 ans.add(eval_rule(sequence,td[0],td[1:]))
-#         else:
-#             ans.add(eval_rule(sequence,todo[0][0],todo[0][1:]))
-#         return ans
+    if type(rules[rule]) is str:
+        matched = (s[i:j]==rules[rule])
 
-
-# def eval_rule(sequence,stack):
-#     if len(stack)==1:
-#         if len(stack[0])>0:
-#             next_item = rules[stack[0].pop(0)]
-#             if type(next_item) is str:
-#                 sequence += next_item
-#             else:
-#                 for el in next_item:
-                    
-#             return eval_rule(sequence,stack)
-#         else:
-#             return sequence
-#     else:
-#         for el in stack:
-
-
-# nums = [1,2,3]
-# perms=[]
-# def p(seq,remaining):
-#     if len(remaining)==0:
-#         perms.append(seq)
-#         return seq
-#     else:
-#         for el in remaining:
-#             new_seq = seq.copy()
-#             new_seq.append(el)
-#             new_remaining=[k for k in remaining if k!=el]
-#             p(new_seq,new_remaining)
-#         return
-
-valid=set()
-def eval_rule(seq,stack,recursion_count):
-    # print(seq)
-    # print(stack)
-    if len(stack)==1:
-        if len(stack[0])==0 or len(seq)==max_msg_length or recursion_count>60:
-            valid.add(seq)
-        else:
-            next_index = stack[0].pop(0)
-            if type(rules[next_index]) is str:
-                new_seq = seq + rules[next_index]
-                eval_rule(new_seq,stack,recursion_count+1)
-            elif len(rules[next_index])==1:
-                new_stuff = rules[next_index][0]
-                for i in range(len(new_stuff)):
-                    stack[0].insert(0,new_stuff[len(new_stuff)-i-1])
-                eval_rule(seq,stack,recursion_count+1)
-            else:
-                for l in rules[next_index]:
-                    new_stack = [[x for x in l]]
-                    for i in range(len(stack[0])):
-                        new_stack[0].append(stack[0][i])
-
-                    # for i in range(len(l)):
-                    #     new_stack2[0].insert(0,l[len(l)-i-1])
-                    # print(f"Calling func with {seq} and {new_stack}")
-                    eval_rule(seq,new_stack, recursion_count+1)
     else:
-        for l in stack:
-            eval_rule(seq,[l],recursion_count+1)
+        for r in rules[rule]:
+            if match_split(s,i,j,r):
+                matched = True
+    
+    DP[k] = matched
+    return matched
 
+def find_ans():
+    ans=0
+    for msg in raw_messages.splitlines():
+        DP.clear()
+        if match_string(msg,0,len(msg),0):
+            ans +=1
+    return ans
 
-eval_rule('',rules[11],0)
-print(valid)
-
-# print(len(valid))
-# ans=0
-# for msg in raw_messages.splitlines():
-#     if msg.strip() in valid:
-#         ans+=1
-# print(ans)
-
-
-# # # eval_rule(0,'')
-# # # print(valid)
-# print(eval_rule('',rules[0]))
+print(find_ans())
