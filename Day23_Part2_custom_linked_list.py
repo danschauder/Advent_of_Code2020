@@ -1,3 +1,7 @@
+"""In this implementation, I created my own LinkedList class. This solution does complete
+eventually, but is fairly slow. I wrote another solution (Day23_Part2_dicts.py) which uses
+built-in dict classes and completes much more quickly than this one"""
+
 # txt="""389125467"""
 txt="""135468729"""
 

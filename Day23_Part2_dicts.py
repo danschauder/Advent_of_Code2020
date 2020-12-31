@@ -1,3 +1,6 @@
+"""This implementation completes much more quickly than
+my custom linked list implementation"""
+
 # txt="""389125467"""
 txt="""135468729"""
 
